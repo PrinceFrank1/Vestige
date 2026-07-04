@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VESTIGE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --warm-black: #0F0F0D;
+            --soft-ivory: #E8E4DD;
+            --stone-grey: #7A756E;
+            --limestone: #C4BFB6;
+            --deep-charcoal: #1A1A17;
+            --beam: rgba(196, 191, 182, 0.03);
+            --beam-bright: rgba(196, 191, 182, 0.08);
+        }
+
+        body {
+            background-color: var(--warm-black);
+            color: var(--soft-ivory);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            cursor: default;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-family: 'Playfair Display', Georgia, serif;
+        }
+
+        /* ====== STAGE SYSTEM ====== */
+        .stage {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+            z-index: 10;
+        }
+
+        .stage.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .stage.exit {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        /* ====== ATMOSPHERE ====== */
+        .atmosphere {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 4s ease;
+        }
+
+        .atmosphere.active {
+            opacity: 1;
+        }
+
+        .atmosphere::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 20%, rgba(196, 191, 182, 0.012) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 80%, rgba(232, 228, 221, 0.008) 0%, transparent 40%);
+            animation: drift 60s ease-in-out infinite;
+        }
+
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(2%, 1%) rotate(0.3deg); }
+            66% { transform: translate(-1%, 2%) rotate(-0.2deg); }
+        }
+
+        /* ====== VIGNETTE ====== */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+            box-shadow: inset 0 0 150px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        /* ====== VERTICAL BEAM ====== */
+        .beam {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent 0%, var(--beam) 20%, var(--beam) 80%, transparent 100%);
+            opacity: 0;
+            transition: opacity 3s ease, background 1s ease;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .beam.active {
+            opacity: 1;
+        }
+
+        .beam.bright {
+            background: linear-gradient(to bottom, transparent 0%, var(--beam-bright) 20%, var(--beam-bright) 80%, transparent 100%);
+        }
+
+        /* ====== STAGE 1: SPLASH ====== */
+        .splash-title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(4rem, 12vw, 10rem);
+            font-weight: 400;
+            letter-spacing: 0.42em;
+            text-transform: uppercase;
+            color: var(--soft-ivory);
+            opacity: 0;
+            filter: blur(2px);
+            transform: scale(0.98);
+            transition: none;
+            will-change: opacity, filter, transform;
+            user-select: none;
+            line-height: 1.1;
+        }
+
+        .splash-title.visible {
+            opacity: 1;
+            filter: blur(0px);
+            transform: scale(1);
+            transition: opacity 2.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        filter 2.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        transform 2.8s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .splash-tagline {
+            font-family: 'Newsreader', Georgia, serif;
+            font-size: clamp(1rem, 2vw, 1.35rem);
+            font-weight: 300;
+            font-style: italic;
+            letter-spacing: 0.18em;
+            color: var(--limestone);
+            margin-top: 2.2rem;
+            opacity: 0;
+            transition: none;
+            will-change: opacity;
+            user-select: none;
+            text-align: center;
+        }
+
+        .splash-tagline.visible {
+            opacity: 0.85;
+            transition: opacity 2.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        /* ====== STAGE 2: PHILOSOPHY ====== */
+        .philosophy-word {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(2.5rem, 7vw, 5rem);
+            font-weight: 300;
+            font-style: italic;
+            letter-spacing: 0.15em;
+            color: var(--soft-ivory);
+            opacity: 0;
+            transform: translateY(8px);
+            transition: none;
+            will-change: opacity, transform;
+            user-select: none;
+        }
+
+        .philosophy-word.visible {
+            opacity: 0.9;
+            transform: translateY(0);
+            transition: opacity 2s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        transform 2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .philosophy-word.exit {
+            opacity: 0;
+            transform: translateY(-8px);
+            transition: opacity 1.5s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        transform 1.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        /* ====== STAGE 3: CURATOR ====== */
+        .curator-line {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+            font-weight: 400;
+            letter-spacing: 0.08em;
+            line-height: 2.2;
+            color: var(--soft-ivory);
+            text-align: center;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: none;
+            will-change: opacity, transform;
+            user-select: none;
+            max-width: 90vw;
+        }
+
+        .curator-line.visible {
+            opacity: 0.85;
+            transform: translateY(0);
+            transition: opacity 2.2s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        transform 2.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .curator-line.exit {
+            opacity: 0;
+            transform: translateY(-6px);
+            transition: opacity 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        transform 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        /* ====== STAGE 4: THRESHOLD ====== */
+        .threshold-logo {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(3.5rem, 10vw, 8rem);
+            font-weight: 400;
+            letter-spacing: 0.45em;
+            text-transform: uppercase;
+            color: var(--soft-ivory);
+            opacity: 0;
+            filter: blur(1px);
+            transform: scale(0.97);
+            transition: none;
+            will-change: opacity, filter, transform;
+            user-select: none;
+            line-height: 1.1;
+        }
+
+        .threshold-logo.visible {
+            opacity: 1;
+            filter: blur(0px);
+            transform: scale(1);
+            transition: opacity 2.5s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        filter 2.5s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        transform 2.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .threshold-subtitle {
+            font-family: 'Newsreader', Georgia, serif;
+            font-size: clamp(0.9rem, 1.6vw, 1.15rem);
+            font-weight: 300;
+            font-style: italic;
+            letter-spacing: 0.2em;
+            color: var(--stone-grey);
+            margin-top: 1.8rem;
+            opacity: 0;
+            transition: none;
+            will-change: opacity;
+            user-select: none;
+            text-align: center;
+        }
+
+        .threshold-subtitle.visible {
+            opacity: 0.7;
+            transition: opacity 2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        /* ====== PROMPT ====== */
+        .threshold-prompt {
+            position: fixed;
+            bottom: 12vh;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            opacity: 0;
+            transition: none;
+            will-change: opacity;
+            z-index: 20;
+            pointer-events: auto;
+        }
+
+        .threshold-prompt.visible {
+            opacity: 0.5;
+            transition: opacity 2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .threshold-prompt:hover {
+            opacity: 0.9;
+        }
+
+        .prompt-text {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+            font-weight: 400;
+            font-style: italic;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--limestone);
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.8s ease, letter-spacing 0.8s ease;
+            padding: 0.5rem 1.5rem;
+        }
+
+        .prompt-text:hover {
+            color: var(--soft-ivory);
+            letter-spacing: 0.35em;
+        }
+
+        .prompt-line {
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(to bottom, var(--stone-grey), transparent);
+            opacity: 0.4;
+            animation: pulseLine 3s ease-in-out infinite;
+        }
+
+        @keyframes pulseLine {
+            0%, 100% { opacity: 0.2; height: 30px; }
+            50% { opacity: 0.5; height: 50px; }
+        }
+
+        /* ====== SWOOSH ====== */
+        .swoosh-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .swoosh-container.active {
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        .swoosh-streak {
+            position: absolute;
+            width: 200%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, rgba(196, 191, 182, 0.15) 20%, rgba(232, 228, 221, 0.3) 50%, rgba(196, 191, 182, 0.15) 80%, transparent 100%);
+            opacity: 0;
+            transform: translateX(-100%);
+        }
+
+        .swoosh-streak:nth-child(1) { top: 35%; animation-delay: 0s; }
+        .swoosh-streak:nth-child(2) { top: 45%; animation-delay: 0.08s; height: 3px; }
+        .swoosh-streak:nth-child(3) { top: 50%; animation-delay: 0.15s; height: 4px; background: linear-gradient(90deg, transparent 0%, rgba(232, 228, 221, 0.2) 20%, rgba(232, 228, 221, 0.4) 50%, rgba(232, 228, 221, 0.2) 80%, transparent 100%); }
+        .swoosh-streak:nth-child(4) { top: 55%; animation-delay: 0.22s; height: 3px; }
+        .swoosh-streak:nth-child(5) { top: 65%; animation-delay: 0.3s; }
+
+        .swoosh-container.active .swoosh-streak {
+            animation: swooshRush 1.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+        }
+
+        @keyframes swooshRush {
+            0% { opacity: 0; transform: translateX(-100%); }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(100%); }
+        }
+
+        /* ====== WALK INTO DARKNESS ====== */
+        .depth-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0;
+        }
+
+        .depth-layer.active {
+            opacity: 1;
+            transition: opacity 2s ease;
+        }
+
+        .depth-layer::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 1px;
+            height: 1px;
+            background: transparent;
+            box-shadow: 0 0 200px 80px rgba(26, 26, 23, 0.3),
+                        0 0 400px 160px rgba(15, 15, 13, 0.5),
+                        0 0 800px 320px rgba(15, 15, 13, 0.7);
+            transform: translate(-50%, -50%);
+            animation: walkForward 6s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+        }
+
+        @keyframes walkForward {
+            0% { box-shadow: 0 0 200px 80px rgba(26, 26, 23, 0.3), 0 0 400px 160px rgba(15, 15, 13, 0.5), 0 0 800px 320px rgba(15, 15, 13, 0.7); }
+            100% { box-shadow: 0 0 50px 20px rgba(26, 26, 23, 0.1), 0 0 100px 40px rgba(15, 15, 13, 0.2), 0 0 200px 80px rgba(15, 15, 13, 0.4); }
+        }
+
+        /* ====== RESPONSIVE ====== */
+        @media (max-width: 480px) {
+            .splash-title, .threshold-logo {
+                letter-spacing: 0.28em;
+                font-size: clamp(3rem, 14vw, 5rem);
+            }
+            .splash-tagline {
+                margin-top: 1.6rem;
+                font-size: clamp(0.9rem, 3.5vw, 1.1rem);
+            }
+            .curator-line {
+                font-size: clamp(0.95rem, 3.5vw, 1.2rem);
+                line-height: 2;
+            }
+            .philosophy-word {
+                font-size: clamp(2rem, 10vw, 3.5rem);
+            }
+            .threshold-prompt {
+                bottom: 15vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="atmosphere" id="atmosphere"></div>
+    <div class="vignette"></div>
+    <div class="beam" id="beam"></div>
+    <div class="depth-layer" id="depthLayer"></div>
+
+    <div class="swoosh-container" id="swooshContainer">
+        <div class="swoosh-streak"></div>
+        <div class="swoosh-streak"></div>
+        <div class="swoosh-streak"></div>
+        <div class="swoosh-streak"></div>
+        <div class="swoosh-streak"></div>
+    </div>
+
+    <!-- STAGE 1: SPLASH -->
+    <div class="stage active" id="stageSplash">
+        <h1 class="splash-title" id="splashTitle">VESTIGE</h1>
+        <p class="splash-tagline" id="splashTagline">Every object remembers.</p>
+    </div>
+
+    <!-- STAGE 2: PHILOSOPHY -->
+    <div class="stage" id="stagePhilosophy">
+        <span class="philosophy-word" id="philosophyWord"></span>
+    </div>
+
+    <!-- STAGE 3: CURATOR -->
+    <div class="stage" id="stageCurator">
+        <p class="curator-line" id="curatorLine"></p>
+    </div>
+
+    <!-- STAGE 4: THRESHOLD -->
+    <div class="stage" id="stageThreshold">
+        <h1 class="threshold-logo" id="thresholdLogo">VESTIGE</h1>
+        <p class="threshold-subtitle" id="thresholdSubtitle">An Interactive Museum of Witnesses</p>
+    </div>
+
+    <!-- PROMPT -->
+    <div class="threshold-prompt" id="thresholdPrompt">
+        <span class="prompt-text" id="promptText">Scroll Forward</span>
+        <div class="prompt-line"></div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const atmosphere = document.getElementById('atmosphere');
+            const beam = document.getElementById('beam');
+            const depthLayer = document.getElementById('depthLayer');
+            const swooshContainer = document.getElementById('swooshContainer');
+            const promptText = document.getElementById('promptText');
+            const thresholdPrompt = document.getElementById('thresholdPrompt');
+
+            const stageSplash = document.getElementById('stageSplash');
+            const splashTitle = document.getElementById('splashTitle');
+            const splashTagline = document.getElementById('splashTagline');
+
+            const stagePhilosophy = document.getElementById('stagePhilosophy');
+            const philosophyWord = document.getElementById('philosophyWord');
+
+            const stageCurator = document.getElementById('stageCurator');
+            const curatorLine = document.getElementById('curatorLine');
+
+            const stageThreshold = document.getElementById('stageThreshold');
+            const thresholdLogo = document.getElementById('thresholdLogo');
+            const thresholdSubtitle = document.getElementById('thresholdSubtitle');
+
+            let hasTransitioned = false;
+            const isMobile = window.matchMedia('(pointer: coarse)').matches;
+            promptText.textContent = isMobile ? 'Swipe to Begin' : 'Scroll Forward';
+
+            function wait(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            function showElement(el, className = 'visible') {
+                el.classList.add(className);
+            }
+
+            function hideElement(el, className = 'visible') {
+                el.classList.remove(className);
+            }
+
+            // ====== STAGE 1: SPLASH ======
+            async function runSplash() {
+                atmosphere.classList.add('active');
+                await wait(100);
+                showElement(splashTitle);
+                await wait(3000);
+                showElement(splashTagline);
+                await wait(3500);
+
+                stageSplash.classList.add('exit');
+                await wait(1200);
+                stageSplash.classList.remove('active', 'exit');
+                hideElement(splashTitle);
+                hideElement(splashTagline);
+
+                runPhilosophy();
+            }
+
+            // ====== STAGE 2: PHILOSOPHY ======
+            async function runPhilosophy() {
+                const words = ['Remember.', 'Witness.', 'Vestige.'];
+                stagePhilosophy.classList.add('active');
+
+                for (const word of words) {
+                    philosophyWord.textContent = word;
+                    showElement(philosophyWord);
+                    await wait(2500);
+                    philosophyWord.classList.add('exit');
+                    await wait(1200);
+                    hideElement(philosophyWord);
+                    philosophyWord.classList.remove('exit');
+                    await wait(300);
+                }
+
+                stagePhilosophy.classList.remove('active');
+                runCurator();
+            }
+
+            // ====== STAGE 3: CURATOR ======
+            async function runCurator() {
+                const lines = [
+                    'You are not here to observe history.',
+                    'You are here to listen to it.'
+                ];
+                stageCurator.classList.add('active');
+
+                for (let i = 0; i < lines.length; i++) {
+                    curatorLine.textContent = lines[i];
+                    showElement(curatorLine);
+                    await wait(i === 0 ? 3000 : 3500);
+                    curatorLine.classList.add('exit');
+                    await wait(1000);
+                    hideElement(curatorLine);
+                    curatorLine.classList.remove('exit');
+                    await wait(400);
+                }
+
+                stageCurator.classList.remove('active');
+                runThreshold();
+            }
+
+            // ====== STAGE 4: THRESHOLD ======
+            async function runThreshold() {
+                stageThreshold.classList.add('active');
+                beam.classList.add('active');
+                await wait(600);
+                showElement(thresholdLogo);
+                await wait(2500);
+                showElement(thresholdSubtitle);
+                await wait(2000);
+                thresholdPrompt.classList.add('visible');
+            }
+
+            // ====== ENTER ARCHIVE -> vestige.html ======
+            async function enterArchive() {
+                if (hasTransitioned) return;
+                hasTransitioned = true;
+
+                thresholdPrompt.classList.remove('visible');
+                thresholdSubtitle.classList.remove('visible');
+                thresholdLogo.style.transition = 'opacity 1.5s ease, letter-spacing 3s ease, filter 2s ease';
+                thresholdLogo.style.letterSpacing = '0.6em';
+                thresholdLogo.style.opacity = '0.12';
+                thresholdLogo.style.filter = 'blur(1px)';
+                beam.classList.add('bright');
+
+                await wait(1800);
+                swooshContainer.classList.add('active');
+                await wait(2000);
+
+                stageThreshold.classList.add('exit');
+                depthLayer.classList.add('active');
+                await wait(2000);
+
+                document.body.style.cursor = 'none';
+                beam.style.opacity = '0';
+                await wait(2500);
+
+                // Navigate to vestige.html
+                window.location.href = 'vestige.html';
+            }
+
+            // ====== EVENT LISTENERS ======
+            thresholdPrompt.addEventListener('click', enterArchive);
+
+            let scrollAccumulator = 0;
+            window.addEventListener('wheel', (e) => {
+                if (!thresholdPrompt.classList.contains('visible') || hasTransitioned) return;
+                scrollAccumulator += Math.abs(e.deltaY);
+                if (scrollAccumulator > 80) {
+                    enterArchive();
+                }
+            }, { passive: true });
+
+            let touchStartY = 0;
+            window.addEventListener('touchstart', (e) => {
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+
+            window.addEventListener('touchend', (e) => {
+                if (!thresholdPrompt.classList.contains('visible') || hasTransitioned) return;
+                const touchEndY = e.changedTouches[0].clientY;
+                const diff = touchStartY - touchEndY;
+                if (diff > 50) {
+                    enterArchive();
+                }
+            }, { passive: true });
+
+            thresholdPrompt.addEventListener('mouseenter', () => {
+                beam.classList.add('bright');
+            });
+            thresholdPrompt.addEventListener('mouseleave', () => {
+                if (!hasTransitioned) beam.classList.remove('bright');
+            });
+
+            // ====== START ======
+            runSplash();
+        })();
+    </script>
+</body>
+</html>

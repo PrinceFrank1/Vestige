@@ -1,0 +1,2365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VESTIGE — Artifact Presentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@200;300;400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0F0F0D;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            color: rgba(255, 255, 255, 0.75);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* --- Testimony (above object) --- */
+        .testimony-container {
+            position: fixed;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            text-align: center;
+            pointer-events: none;
+            width: 90%;
+            max-width: 900px;
+        }
+
+        .testimony-word {
+            display: inline-block;
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 300;
+            font-style: italic;
+            font-size: clamp(1.1rem, 2.5vw, 1.6rem);
+            color: rgba(255, 255, 255, 0.45);
+            letter-spacing: 0.04em;
+            line-height: 1.8;
+            margin: 0 0.3em;
+            opacity: 0;
+            transition: opacity 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .testimony-word.visible {
+            opacity: 0.7;
+        }
+
+        /* --- Identity Panel (bottom 35%) --- */
+        .identity-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 35%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 0 clamp(2rem, 6vw, 5rem) clamp(2.5rem, 5vh, 4rem);
+            background: linear-gradient(
+                to top,
+                rgba(15, 15, 13, 0.85) 0%,
+                rgba(15, 15, 13, 0.4) 50%,
+                transparent 100%
+            );
+        }
+
+        .identity-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .artifact-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 400;
+            font-size: clamp(2rem, 5vw, 4.2rem);
+            color: rgba(255, 255, 255, 0.92);
+            letter-spacing: 0.06em;
+            line-height: 1.1;
+            margin-bottom: 1.8rem;
+            text-transform: uppercase;
+        }
+
+        .identity-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2.5rem 4rem;
+            align-items: baseline;
+        }
+
+        .detail-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .detail-label {
+            font-family: 'Inter', sans-serif;
+            font-weight: 300;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .detail-value {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 400;
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.65);
+            letter-spacing: 0.03em;
+        }
+
+        /* --- Vignette overlay --- */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+            box-shadow: inset 0 0 180px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        /* --- Loading state --- */
+        .loading {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: #0F0F0D;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1.2s ease, visibility 1.2s ease;
+        }
+
+        .loading.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .loading-text {
+            font-family: 'Cormorant Garamond', serif;
+            font-weight: 300;
+            font-size: 0.9rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.25);
+            animation: breathe 3s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.5; }
+        }
+
+        /* --- Entrance animations --- */
+        .fade-in-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
+                        transform 1.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .fade-in-up.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    
+        /* ─── Playback Controls ─── */
+        .playback-anchor {
+            position: fixed;
+            bottom: 2.2rem;
+            right: clamp(2rem, 6vw, 5rem);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.6rem;
+            pointer-events: auto;
+        }
+
+        .playback-trigger {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+            color: rgba(255, 255, 255, 0.5);
+            outline: none;
+        }
+
+        .playback-trigger:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.8);
+            transform: scale(1.08);
+        }
+
+        .playback-trigger:active { transform: scale(0.96); }
+
+        .playback-trigger svg {
+            width: 18px;
+            height: 18px;
+            transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .playback-trigger.active svg { transform: rotate(90deg); }
+
+        .playback-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.5rem 0.7rem;
+            background: rgba(15, 15, 13, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+                        0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+            opacity: 0;
+            transform: translateY(12px) scale(0.92);
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .playback-bar.open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .playback-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.4);
+            transition: all 0.25s ease;
+            position: relative;
+            outline: none;
+        }
+
+        .playback-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .playback-btn:hover::before { opacity: 1; }
+        .playback-btn:hover { color: rgba(255, 255, 255, 0.85); }
+        .playback-btn:active { transform: scale(0.92); }
+
+        .playback-btn svg {
+            width: 16px;
+            height: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .playback-btn.primary { color: rgba(255, 255, 255, 0.7); }
+        .playback-btn.primary:hover { color: rgba(255, 255, 255, 1); }
+        .playback-btn.primary::before { background: rgba(255, 255, 255, 0.1); }
+
+        .playback-divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.08);
+            margin: 0 0.2rem;
+        }
+
+        .playback-progress {
+            position: absolute;
+            bottom: -1px;
+            left: 8px;
+            right: 8px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 1px;
+            overflow: hidden;
+        }
+
+        .playback-progress-fill {
+            height: 100%;
+            background: rgba(255, 255, 255, 0.35);
+            border-radius: 1px;
+            transition: width 0.3s linear;
+            width: 0%;
+        }
+
+        .playback-hint {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.55rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            transform: translateY(4px);
+            transition: all 0.3s ease 0.1s;
+        }
+
+        .playback-bar.open ~ .playback-hint {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .key-hint {
+            position: absolute;
+            bottom: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            color: rgba(255, 255, 255, 0.15);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .playback-btn:hover .key-hint { opacity: 1; }
+
+        .pause-indicator {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(255, 200, 120, 0.7);
+            top: 10px;
+            right: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .playback-trigger.paused .pause-indicator { opacity: 1; }
+</style>
+<base target="_blank">
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div class="loading" id="loading">
+        <span class="loading-text">Preparing the witness</span>
+    </div>
+
+    <!-- Vignette -->
+    <div class="vignette"></div>
+
+    <!-- Testimony -->
+    <div class="testimony-container" id="testimony"></div>
+
+    <!-- Identity Panel -->
+    <div class="identity-panel">
+        <div class="identity-content">
+            <h1 class="artifact-title fade-in-up" id="title" style="transition-delay: 0s">Triceratops Horridus</h1>
+            <div class="identity-details">
+                <div class="detail-group fade-in-up" style="transition-delay: 0.07s">
+                    <span class="detail-label">Period</span>
+                    <span class="detail-value" id="detail-period">Late Cretaceous, 68–66 MYA</span>
+                </div>
+                <div class="detail-group fade-in-up" style="transition-delay: 0.14s">
+                    <span class="detail-label">Location</span>
+                    <span class="detail-value" id="detail-location">Hell Creek Formation, Montana</span>
+                </div>
+                <div class="detail-group fade-in-up" style="transition-delay: 0.21s">
+                    <span class="detail-label">Discovery</span>
+                    <span class="detail-value" id="detail-discovery">1887, by John Bell Hatcher</span>
+                </div>
+                <div class="detail-group fade-in-up" style="transition-delay: 0.28s">
+                    <span class="detail-label">Material</span>
+                    <span class="detail-value" id="detail-material">Fossilized bone, mineralized tissue</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Playback Controls -->
+    <div class="playback-anchor" id="playback-anchor">
+        <div class="playback-bar" id="playback-bar">
+            <div style="position: relative;">
+                <button class="playback-btn" id="btn-prev" title="Previous artifact">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="19,20 9,12 19,4 19,20"></polygon>
+                        <line x1="5" y1="19" x2="5" y2="5"></line>
+                    </svg>
+                    <span class="key-hint">←</span>
+                </button>
+            </div>
+            <div style="position: relative;">
+                <button class="playback-btn primary" id="btn-play-pause" title="Play / Pause">
+                    <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+                        <polygon points="5,3 19,12 5,21 5,3"></polygon>
+                    </svg>
+                    <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                    <span class="key-hint">Space</span>
+                </button>
+            </div>
+            <div style="position: relative;">
+                <button class="playback-btn" id="btn-next" title="Next artifact">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5,4 15,12 5,20 5,4"></polygon>
+                        <line x1="19" y1="5" x2="19" y2="19"></line>
+                    </svg>
+                    <span class="key-hint">→</span>
+                </button>
+            </div>
+            <div class="playback-divider"></div>
+            <div style="position: relative;">
+                <button class="playback-btn" id="btn-restart" title="Restart current">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="1,4 1,10 7,10"></polyline>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    <span class="key-hint">R</span>
+                </button>
+            </div>
+            <div class="playback-progress">
+                <div class="playback-progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+        <button class="playback-trigger" id="playback-trigger" title="Show controls">
+            <span class="pause-indicator"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+        </button>
+        <div class="playback-hint">Auto-hides in 3s</div>
+    </div>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+        // ─────────────────────────────────────────
+        // SCENE SETUP
+        // ─────────────────────────────────────────
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0F0F0D);
+
+        // Very subtle atmospheric gradient — not stars, not particles
+        // Just a barely-there shift in the void
+        const fogColor = new THREE.Color(0x111111);
+        scene.fog = new THREE.FogExp2(fogColor, 0.035);
+
+        const camera = new THREE.PerspectiveCamera(
+            35, // ~50-70mm equivalent feel
+            window.innerWidth / window.innerHeight,
+            0.1,
+            100
+        );
+        camera.position.set(0, 1.2, 7.5);
+
+        const renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            powerPreference: 'high-performance'
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.95;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        container.appendChild(renderer.domElement);
+
+        // ─────────────────────────────────────────
+        // ENVIRONMENT LIGHTING (image-based, invisible)
+        // ─────────────────────────────────────────
+        // Most GLB exports use PBR materials (MeshStandardMaterial /
+        // MeshPhysicalMaterial) that lean heavily on environment
+        // reflections for their metallic/specular response — without
+        // one, metal and gold-plated surfaces can read as flat or
+        // nearly black no matter how many direct lights hit them. This
+        // generates a soft neutral studio environment purely for
+        // lighting purposes; it's assigned to scene.environment, not
+        // scene.background, so the room stays exactly as black as
+        // before and nothing is visibly "lit up" except the artifacts
+        // themselves. Per-exhibit strength is controlled by each
+        // material's envMapIntensity (see loadArtifact), which defaults
+        // to 0 — so this has zero visible effect on any exhibit unless
+        // its direction explicitly opts in via direction.envMapIntensity.
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+        pmremGenerator.dispose();
+
+        // ─────────────────────────────────────────
+        // CAMERA CONTROLS: inertial, museum-style
+        // ─────────────────────────────────────────
+        // Not CAD-software orbit controls — damped, capped, and gently
+        // self-rotating so the visitor is invited around the artifact
+        // rather than free to fling it into orbit.
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1.3, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.35;
+        controls.enablePan = false;
+        controls.minDistance = 2.8;
+        controls.maxDistance = 5.5;
+        controls.maxPolarAngle = Math.PI * 0.75;
+        controls.minPolarAngle = Math.PI * 0.25;
+        controls.update();
+
+        // Fallbacks used by applyDirection() when a given exhibit's
+        // `direction` doesn't specify its own value for these.
+        const DEFAULT_SPOT_COLOR = 0xFFF8F0;
+        const DEFAULT_AUTOROTATE_SPEED = 0.35;
+        const DEFAULT_CAMERA_TARGET_Y = 1.3;
+
+        // ─────────────────────────────────────────
+        // ARTIFACT DATA
+        // ─────────────────────────────────────────
+        // Adding a new exhibit requires ONLY a new entry here. The
+        // loading/normalization pipeline and the transition system below
+        // need no changes.
+        // Each artifact carries two kinds of data:
+        //  - the museum-label facts (title/period/location/etc.)
+        //  - a `transform` fine-tune applied AFTER auto-centering/scaling,
+        //    for objects whose bounding-box center isn't their visual center
+        //  - a `direction` object: the per-exhibit "choreography" — how
+        //    it's lit, how it idles, how close the camera sits, and how
+        //    fast its testimony speaks. This is what makes each exhibit
+        //    feel curated rather than templated.
+        const ARTIFACTS = [
+            {
+                title: "Triceratops Horridus",
+                file: "triceratops.glb",
+                period: "Late Cretaceous, 68–66 MYA",
+                location: "Hell Creek Formation, Montana",
+                discovery: "1887, by John Bell Hatcher",
+                material: "Fossilized bone, mineralized tissue",
+                quote: "I remember forests that no map ever drew.",
+                transform: {
+                    scale: 1,
+                    rotation: [0, 0, 0],
+                    position: [0, 0, 0],
+                },
+                direction: {
+                    // "orbit": the camera slowly circles the artifact.
+                    // "breathe": the camera holds still and the artifact
+                    // itself sways gently, like a painting being studied.
+                    idle: 'orbit',
+                    spotlight: {
+                        angle: Math.PI / 5,   // broad theatrical wash
+                        penumbra: 0.65,
+                        intensity: 160,
+                    },
+                    cameraDistance: { min: 2.8, max: 5.5 },
+                    wordInterval: 320,        // testimony pace, ms/word
+                    entranceDuration: 2000,
+                    exitDuration: 400,
+                    dwellMs: 17000,           // +3s over the default — first
+                                              // exhibit gets a bit longer to land
+                },
+            },
+            {
+                title: "Benin Bronze Plaque",
+                file: "three_benin.glb",
+                period: "16th–17th Century",
+                location: "Kingdom of Benin, present-day Nigeria",
+                discovery: "Removed 1897, British Punitive Expedition",
+                material: "Cast bronze, leaded",
+                quote: "I remember the hands that shaped me, and the ones that took me.",
+                transform: {
+                    scale: 1.15,
+                    rotation: [0, Math.PI / 10, 0],
+                    position: [0, 0.15, 0],
+                },
+                direction: {
+                    idle: 'breathe',          // contemplative, not mechanical
+                    spotlight: {
+                        angle: Math.PI / 10,  // narrow, interrogating beam
+                        penumbra: 0.35,
+                        intensity: 220,
+                    },
+                    cameraDistance: { min: 3.2, max: 4.2 },
+                    wordInterval: 380,         // slightly slower, more weight
+                    entranceDuration: 2600,    // settles in more reverently
+                    exitDuration: 400,
+                },
+            },
+            {
+                title: "Terracotta Warrior",
+                file: "terracotta.glb",
+                period: "Qin Dynasty, 210–209 BCE",
+                location: "Xi'an, Shaanxi, China",
+                discovery: "1974, by local farmers",
+                material: "Fired terracotta with original pigment traces",
+                quote: "I stood guard long after the emperor fell.",
+                transform: {
+                    scale: 1,
+                    rotation: [0, 0, 0],
+                    position: [0, 0, 0],
+                },
+                direction: {
+                    // Held still on arrival, then an almost imperceptible
+                    // vertical-axis rotation begins — see idleStartDelayMs
+                    // and autoRotateSpeed below. The Benin Bronze was
+                    // intimate; this is monumental — the visitor should
+                    // feel they're standing beside a statue in a quiet
+                    // gallery, not watching an object perform.
+                    idle: 'still-then-orbit',
+                    idleStartDelayMs: 2000,   // ~2s of stillness before any motion
+                    autoRotateSpeed: 0.08,    // much slower than Triceratops's 0.35
+                    spotlight: {
+                        angle: Math.PI / 9,   // narrow, but a touch broader than
+                                              // Benin's interrogating beam — this
+                                              // is a monument, not an interrogation
+                        penumbra: 0.4,
+                        intensity: 190,
+                        color: 0xE7EEF7,      // slightly colder/bluer than the
+                                              // warm 0xFFF8F0 used elsewhere
+                    },
+                    // A tiny cinematic adjustment for the taller
+                    // artifact: a touch more room to breathe, and the
+                    // camera's gaze retargeted a little higher.
+                    cameraDistance: { min: 3.2, max: 5.6 },
+                    cameraTargetY: 1.55,
+                    poolOpacity: 0.5,         // strengthened floor light —
+                                              // grounds a monumental piece
+                    wordInterval: 340,
+                    entranceDuration: 2400,
+                    exitDuration: 400,
+                },
+            },
+            {
+                title: "Voyager 1",
+                file: "voyager-1.glb",
+                period: "Launched 1977",
+                location: "Interstellar Space",
+                // Shown under the "Mission" label for this exhibit only —
+                // see detailLabels below.
+                discovery: "NASA Deep Space Exploration",
+                material: [
+                    "Gold-plated components",
+                    "Scientific instruments",
+                    "Radioisotope power source",
+                ],
+                detailLabels: ['Period', 'Location', 'Mission', 'Material'],
+                quote: "I carry voices from a world already behind me.",
+                transform: {
+                    scale: 1,
+                    rotation: [0, 0, 0],
+                    position: [0, 0, 0],
+                },
+                direction: {
+                    // Not orbiting, not breathing for an audience — a
+                    // near-imperceptible tumble and positional wander,
+                    // like something that has been travelling alone for
+                    // decades. See idleMode === 'drift' in the animation
+                    // loop.
+                    idle: 'drift',
+
+                    // Flags this exhibit as the one place in Vestige that
+                    // isn't Earth. Read by advanceToNextArtifact() to skip
+                    // the swoosh in favor of a total, held blackout, and
+                    // by applyDirection() to strip the museum staging
+                    // (spotlight, floor glow, warm ambient) down to almost
+                    // nothing.
+                    spaceMode: true,
+
+                    spotlight: {
+                        // Unused angle/penumbra — intensity 0 means no
+                        // theatrical spotlight ever appears here.
+                        angle: Math.PI / 9,
+                        penumbra: 0.4,
+                        intensity: 0,
+                    },
+
+                    // The rim light is repurposed as a distant "sun"
+                    // rather than a museum edge-kiss. Positioned toward
+                    // camera-front rather than pure backlight, so it
+                    // rakes a real streak of light across the boom and
+                    // dish instead of leaving the spacecraft a near-
+                    // invisible silhouette against the void.
+                    rimLight: {
+                        intensity: 9,
+                        color: 0xC7DBFF,
+                        position: [7, 5.5, 5],
+                        angle: Math.PI / 5,
+                        penumbra: 0.55,
+                        distance: 60,
+                        decay: 1.3,
+                    },
+                    fillLight: {
+                        intensity: 0.12,
+                        color: 0x8FA6CC,
+                    },
+                    ambientIntensity: 0.05,
+                    // The single biggest fix for a spacecraft that reads
+                    // as flat/near-black: PBR metal and gold-plated
+                    // surfaces need environment reflections, not just
+                    // direct light, to read as lit. See scene.environment
+                    // above — this opts Voyager into it; every other
+                    // exhibit stays untouched (default is 0).
+                    envMapIntensity: 1.4,
+                    poolOpacity: 0,     // no floor glow — there is no floor
+                    beamOpacity: 0,     // no visible spotlight cone
+                    starOpacity: 0.4,   // ~30-50 faint points, see starField
+
+                    // Farther back than any previous exhibit — Voyager
+                    // should never fill the frame. The emptiness around
+                    // it is the point.
+                    cameraDistance: { min: 6.5, max: 11 },
+                    cameraTargetY: 0.8,
+
+                    wordInterval: 460,       // slow, contemplative
+                    entranceDuration: 4200,  // nothing rushes
+                    exitDuration: 1000,
+                    dwellMs: 20000,          // let the loneliness sit
+
+                    // A very small golden catch-light briefly grazes one
+                    // edge of the spacecraft ~8s after arrival — no label,
+                    // no explanation. See scheduleGoldenGlint().
+                    goldenGlintDelayMs: 8000,
+                },
+            },
+            {
+                title: "The Rosetta Stone",
+                file: "rosetta.glb",
+                period: "196 BCE",
+                location: [
+                    "Originally: Memphis, Egypt",
+                    "Currently: British Museum, London",
+                ],
+                discovery: [
+                    "Discovered in 1799",
+                    "Fort Julien, Rashid (Rosetta)",
+                ],
+                material: "Granodiorite",
+                quote: "I carried three voices until humanity learned to hear one.",
+                transform: {
+                    scale: 1,
+                    rotation: [0, 0, 0],
+                    position: [0, 0, 0],
+                    targetSize: 1.4,
+                },
+                direction: {
+                    // Not a display turntable — the stone holds perfectly
+                    // still and only occasionally offers a different face,
+                    // like a curator presenting it rather than a specimen
+                    // spinning for an audience. See idleMode === 'present'
+                    // and schedulePresentRotation().
+                    idle: 'present',
+                    presentRotationDeg: 8,       // "rotate only about 8°"
+                    presentIntervalMinMs: 12000, // "every 12–15 seconds"
+                    presentIntervalMaxMs: 15000,
+
+                    spotlight: {
+                        angle: Math.PI / 7,   // closer, more attentive than
+                                              // Triceratops's broad wash
+                        penumbra: 0.5,
+                        intensity: 200,
+                        color: 0xFFF3E0,       // warm museum light
+                    },
+                    // "Light begins at the base and gently climbs upward"
+                    // is approximated, without introducing a literal
+                    // vertical light-sweep into the engine, as a phased
+                    // ignite: the floor glow and ambient resolve first
+                    // (grounding), then the spotlight itself rises in
+                    // more slowly than the usual quick ignite.
+                    staggeredIgnite: true,
+
+                    rimLight: {
+                        intensity: 8,          // soft, not an interrogation
+                    },
+                    fillLight: {
+                        intensity: 0.18,
+                    },
+                    // Doubles as the "very soft bounce light from below" —
+                    // a stronger floor glow rather than a literal uplight.
+                    poolOpacity: 0.5,
+
+                    // Closer than any previous exhibit — the inscriptions
+                    // deserve attention — with the top never cropped
+                    // thanks to the framing headroom baked into the
+                    // camera's default vertical field of view.
+                    cameraDistance: { min: 2.6, max: 3.8 },
+                    cameraTargetY: 1.35,
+
+                    wordInterval: 420,        // scholarly, unhurried
+                    entranceDuration: 3000,
+                    exitDuration: 900,
+                    dwellMs: 18000,
+                },
+            },
+        ];
+
+        const ARTIFACT_BASE_PATH = './artifacts/';
+
+        // Index of the exhibit currently on display.
+        let currentArtifactIndex = 0;
+
+        // ─────────────────────────────────────────
+        // STAGE GROUP
+        // ─────────────────────────────────────────
+        // Everything spatial about the exhibit — the artifact, its
+        // floor, its light pool, and its lights — lives inside this
+        // group. The swoosh transition moves this group, not the
+        // camera, so "the world moves, not the visitor."
+        const stageGroup = new THREE.Group();
+        scene.add(stageGroup);
+
+        // ─────────────────────────────────────────
+        // ARTIFACT ROOT
+        // ─────────────────────────────────────────
+        // Every loaded GLB is attached here rather than directly to the
+        // scene. This is what the spotlight, rim light, rotation, and
+        // camera focus target — replacing the old placeholder cube.
+        const artifactRoot = new THREE.Group();
+        const ARTIFACT_ROOT_BASE_Y = 0.8; // Sits just above the invisible floor
+        artifactRoot.position.y = ARTIFACT_ROOT_BASE_Y;
+        stageGroup.add(artifactRoot);
+
+        // Materials collected from the currently-loaded artifact, used for
+        // the entrance fade-in and the exit fade-out.
+        let artifactMaterials = [];
+
+        // ─────────────────────────────────────────
+        // GLTF / DRACO LOADER SETUP
+        // ─────────────────────────────────────────
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
+
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.setDRACOLoader(dracoLoader);
+
+        // Default target size (in scene units) that artifacts are normalized
+        // to fit within. Individual artifacts can override via transform.targetSize.
+        const DEFAULT_TARGET_ARTIFACT_SIZE = 2.5;
+
+        function loadArtifact(artifactData, { autoEntrance = true } = {}) {
+            const url = ARTIFACT_BASE_PATH + artifactData.file;
+
+            return new Promise((resolve, reject) => {
+                gltfLoader.load(
+                    url,
+                    (gltf) => {
+                        const model = gltf.scene;
+
+                        const t = artifactData.transform || {
+                            scale: 1, rotation: [0, 0, 0], position: [0, 0, 0],
+                        };
+
+                        // Rotate FIRST, before measuring anything. If we
+                        // centered under rotation=0 and rotated afterward,
+                        // the mesh would swing around whatever pivot it
+                        // happened to be exported with — invisible for a
+                        // pivot near the centroid, but wildly off-frame
+                        // for a scan whose origin sits away from center
+                        // (e.g. a plaque with an off-corner pivot). This
+                        // order makes centering correct regardless of
+                        // where the artifact's own pivot was in Blender —
+                        // nothing to fix on that end.
+                        const [rx, ry, rz] = t.rotation || [0, 0, 0];
+                        model.rotation.set(rx, ry, rz);
+
+                        // Compute bounding box AFTER rotation, at scale 1.
+                        const box = new THREE.Box3().setFromObject(model);
+                        const size = new THREE.Vector3();
+                        const center = new THREE.Vector3();
+                        box.getSize(size);
+                        box.getCenter(center);
+                        const largestDimension = Math.max(size.x, size.y, size.z) || 1;
+
+                        // Normalize scale so every artifact fits the same
+                        // stage footprint, combined with the curator's own
+                        // fine-tune multiplier in one step.
+                        // Per-artifact targetSize allows slabs (Rosetta) to be smaller than statues (Triceratops).
+                        const targetSize = t.targetSize ?? DEFAULT_TARGET_ARTIFACT_SIZE;
+                        const scaleFactor = (targetSize / largestDimension) * (t.scale ?? 1);
+                        model.scale.setScalar(scaleFactor);
+
+                        // Center the already-rotated model. `center` was
+                        // measured at scale 1, so it must be scaled by the
+                        // same factor before being used to cancel out the
+                        // translation (position and scale compose as
+                        // T + scale * rotatedVertex, not independently).
+                        model.position.copy(center).multiplyScalar(-scaleFactor);
+
+                        // Finally, the curator's small corrective nudge —
+                        // a deliberate offset on top of the now-correct
+                        // automatic centering.
+                        const [px, py, pz] = t.position || [0, 0, 0];
+                        model.position.add(new THREE.Vector3(px, py, pz));
+
+                        // Enable shadows on every mesh in the loaded artifact,
+                        // and collect materials for the entrance fade-in.
+                        // envMapIntensity defaults to 0 — the new environment
+                        // map (see above) has literally no visible effect
+                        // unless an exhibit's direction explicitly asks for
+                        // it, so Triceratops/Benin/Terracotta render exactly
+                        // as before.
+                        const envIntensity = artifactData.direction?.envMapIntensity ?? 0;
+                        artifactMaterials = [];
+                        model.traverse((node) => {
+                            if (node.isMesh) {
+                                node.castShadow = true;
+                                node.receiveShadow = true;
+                                if (node.material) {
+                                    node.material.transparent = true;
+                                    node.material.opacity = 0;
+                                    if ('envMapIntensity' in node.material) {
+                                        node.material.envMapIntensity = envIntensity;
+                                    }
+                                    artifactMaterials.push(node.material);
+                                }
+                            }
+                        });
+
+                        artifactRoot.add(model);
+
+                        if (autoEntrance) {
+                            entranceComplete = false;
+                            entranceStartTime = performance.now();
+                        }
+
+                        resolve(model);
+                    },
+                    undefined,
+                    (error) => {
+                        console.error(
+                            `[Vestige] Failed to load artifact "${artifactData.title}" from "${url}":`,
+                            error
+                        );
+                        reject(error);
+                    }
+                );
+            });
+        }
+
+        // Dispose of the currently-loaded artifact's geometries, materials,
+        // and textures, then empty artifactRoot. Called before loading the
+        // next exhibit so nothing leaks across transitions.
+        function disposeArtifactModel() {
+            while (artifactRoot.children.length > 0) {
+                const child = artifactRoot.children[0];
+                child.traverse((node) => {
+                    if (node.isMesh) {
+                        node.geometry?.dispose();
+                        const materials = Array.isArray(node.material) ? node.material : [node.material];
+                        materials.forEach((mat) => {
+                            if (!mat) return;
+                            Object.values(mat).forEach((value) => {
+                                if (value && value.isTexture) value.dispose();
+                            });
+                            mat.dispose();
+                        });
+                    }
+                });
+                artifactRoot.remove(child);
+            }
+            artifactMaterials = [];
+        }
+
+        // Load the first artifact in the collection.
+        loadArtifact(ARTIFACTS[0]);
+
+        // ─────────────────────────────────────────
+        // INVISIBLE FLOOR (shadow catcher only)
+        // ─────────────────────────────────────────
+        const floorGeometry = new THREE.PlaneGeometry(50, 50);
+        const floorMaterial = new THREE.ShadowMaterial({
+            opacity: 0.25,
+            color: 0x000000
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0;
+        floor.receiveShadow = true;
+        stageGroup.add(floor);
+
+        // ─────────────────────────────────────────
+        // LIGHT POOL: a faint circular glow beneath the artifact
+        // ─────────────────────────────────────────
+        // Not a pedestal, not a box — just a place. A soft radial
+        // gradient, additively blended, so the artifact reads as
+        // resting somewhere rather than floating in nothing.
+        const poolCanvas = document.createElement('canvas');
+        poolCanvas.width = 256;
+        poolCanvas.height = 256;
+        const poolCtx = poolCanvas.getContext('2d');
+        const poolGradient = poolCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        poolGradient.addColorStop(0, 'rgba(255, 244, 224, 0.9)');
+        poolGradient.addColorStop(0.5, 'rgba(255, 244, 224, 0.25)');
+        poolGradient.addColorStop(1, 'rgba(255, 244, 224, 0)');
+        poolCtx.fillStyle = poolGradient;
+        poolCtx.fillRect(0, 0, 256, 256);
+        const poolTexture = new THREE.CanvasTexture(poolCanvas);
+
+        const LIGHT_POOL_OPACITY = 0.35;
+        const lightPool = new THREE.Mesh(
+            new THREE.PlaneGeometry(3.4, 3.4),
+            new THREE.MeshBasicMaterial({
+                map: poolTexture,
+                transparent: true,
+                opacity: LIGHT_POOL_OPACITY,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            })
+        );
+        lightPool.rotation.x = -Math.PI / 2;
+        lightPool.position.y = 0.01; // Just above the floor, avoids z-fighting
+        stageGroup.add(lightPool);
+
+        // ─────────────────────────────────────────
+        // STARFIELD: dormant except in space-mode exhibits
+        // ─────────────────────────────────────────
+        // Most films overdo space. This is the opposite: a handful of
+        // extremely faint points, no Milky Way, no nebulae — the
+        // emptiness is the point. Lives directly on `scene` (not
+        // `stageGroup`) since it represents the visitor's surroundings,
+        // not part of the exhibit that gets thrown sideways in a swoosh.
+        // Opacity is 0 by default, so it is completely inert for every
+        // exhibit that doesn't explicitly ask for it via direction.starOpacity.
+        const STAR_COUNT = 42;
+        const starGeometry = new THREE.BufferGeometry();
+        const starPositions = new Float32Array(STAR_COUNT * 3);
+        for (let i = 0; i < STAR_COUNT; i++) {
+            const radius = 35 + Math.random() * 25;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(Math.random() * 2 - 1);
+            starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+            starPositions[i * 3 + 1] = radius * Math.cos(phi);
+            starPositions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMaterial = new THREE.PointsMaterial({
+            color: 0xF4F6FF,
+            size: 0.05,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            sizeAttenuation: true,
+        });
+        const starField = new THREE.Points(starGeometry, starMaterial);
+        scene.add(starField);
+
+        // ─────────────────────────────────────────
+        // LIGHTING: Museum-quality, restrained
+        // ─────────────────────────────────────────
+
+        // 1. Main spotlight — theatrical, angled slightly off-vertical
+        //    for a longer, more cinematic shadow instead of a flat
+        //    straight-down pool. Angle/penumbra/intensity are retuned
+        //    per artifact by applyDirection() below — this is just the
+        //    starting personality (Triceratops's broad wash).
+        let MAIN_SPOT_INTENSITY = 160;
+        const mainSpot = new THREE.SpotLight(0xFFF8F0, MAIN_SPOT_INTENSITY);
+        mainSpot.position.set(1.6, 7.5, 1.4);
+        mainSpot.target = artifactRoot;
+        mainSpot.angle = Math.PI / 5;
+        mainSpot.penumbra = 0.65;
+        mainSpot.decay = 2;
+        mainSpot.distance = 25;
+        mainSpot.castShadow = true;
+        mainSpot.shadow.mapSize.width = 2048;
+        mainSpot.shadow.mapSize.height = 2048;
+        mainSpot.shadow.bias = -0.0001;
+        mainSpot.shadow.radius = 8; // Soft, long shadow edges
+        stageGroup.add(mainSpot);
+
+        // 1b. Visible beam — a faint additive cone tracing the
+        //     spotlight's throw, so the light itself has presence
+        //     rather than only its effect on the artifact. Rebuilt
+        //     whenever the spotlight's angle changes between exhibits
+        //     (see rebuildLightBeam below) — a broad wash and a narrow
+        //     interrogating beam need differently-shaped cones.
+        const beamHeight = mainSpot.position.y - artifactRoot.position.y;
+        function computeBeamGeometry(angle) {
+            const beamRadius = beamHeight * Math.tan(angle);
+            return new THREE.ConeGeometry(beamRadius, beamHeight, 48, 1, true);
+        }
+        const BEAM_OPACITY = 0.035;
+        const beamMaterial = new THREE.MeshBasicMaterial({
+            color: 0xFFF8F0,
+            transparent: true,
+            opacity: BEAM_OPACITY,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const lightBeam = new THREE.Mesh(computeBeamGeometry(mainSpot.angle), beamMaterial);
+        lightBeam.position.set(
+            mainSpot.position.x,
+            mainSpot.position.y - beamHeight / 2,
+            mainSpot.position.z
+        );
+        stageGroup.add(lightBeam);
+
+        function rebuildLightBeam(angle) {
+            lightBeam.geometry.dispose();
+            lightBeam.geometry = computeBeamGeometry(angle);
+        }
+
+        // Defaults for the per-exhibit overrides applied in applyDirection().
+        // Every existing exhibit relies on these implicitly (they specify
+        // no direction.fillLight/rimLight/etc.), so these values must match
+        // what was previously hardcoded here.
+        const DEFAULT_FILL_COLOR = 0xE8E0D8;
+        const DEFAULT_FILL_INTENSITY = 0.15;
+        const DEFAULT_RIM_COLOR = 0xFFF5E8;
+        const DEFAULT_RIM_INTENSITY = 12;
+        const DEFAULT_RIM_POSITION = [4, 3, -4];
+        const DEFAULT_RIM_ANGLE = Math.PI / 8;
+        const DEFAULT_RIM_PENUMBRA = 0.8;
+        const DEFAULT_RIM_DISTANCE = 15;
+        const DEFAULT_RIM_DECAY = 2;
+        const DEFAULT_AMBIENT_INTENSITY = 0.3;
+
+        // 2. Very faint fill light — prevents complete black shadows
+        let FILL_LIGHT_INTENSITY = DEFAULT_FILL_INTENSITY;
+        const fillLight = new THREE.DirectionalLight(DEFAULT_FILL_COLOR, FILL_LIGHT_INTENSITY);
+        fillLight.position.set(-3, 2, 4);
+        stageGroup.add(fillLight);
+
+        // 3. Subtle rim light — separates object from darkness. A
+        //    space-mode exhibit can repurpose this same light as a
+        //    faint, distant "sun" (wider, weaker, colder) rather than
+        //    introducing a second light type — see applyDirection().
+        let RIM_LIGHT_INTENSITY = DEFAULT_RIM_INTENSITY;
+        const rimLight = new THREE.SpotLight(DEFAULT_RIM_COLOR, RIM_LIGHT_INTENSITY);
+        rimLight.position.set(...DEFAULT_RIM_POSITION);
+        rimLight.target = artifactRoot;
+        rimLight.angle = DEFAULT_RIM_ANGLE;
+        rimLight.penumbra = DEFAULT_RIM_PENUMBRA;
+        rimLight.decay = DEFAULT_RIM_DECAY;
+        rimLight.distance = DEFAULT_RIM_DISTANCE;
+        stageGroup.add(rimLight);
+
+        // Ambient — barely there, just enough to prevent pitch black.
+        // Retuned per exhibit via direction.ambientIntensity (see
+        // applyDirection / currentAmbientIntensity) — a space exhibit
+        // wants this close to zero.
+        const ambient = new THREE.AmbientLight(0x1A1815, DEFAULT_AMBIENT_INTENSITY);
+        scene.add(ambient);
+
+        // A one-off, near-invisible accent light used only by exhibits
+        // that request it via direction.goldenGlintDelayMs — a small
+        // golden catch-light that briefly grazes one edge of the object.
+        // Intensity is 0 by default, so it's completely inert everywhere
+        // else. See scheduleGoldenGlint().
+        const GOLDEN_GLINT_INTENSITY = 3.5;
+        const goldenGlintLight = new THREE.SpotLight(0xFFD9A0, 0);
+        goldenGlintLight.position.set(-2.2, 1.6, 2.6);
+        goldenGlintLight.target = artifactRoot;
+        goldenGlintLight.angle = Math.PI / 20;
+        goldenGlintLight.penumbra = 0.9;
+        goldenGlintLight.decay = 2;
+        goldenGlintLight.distance = 12;
+        stageGroup.add(goldenGlintLight);
+
+        // ─────────────────────────────────────────
+        // TESTIMONY SYSTEM
+        // ─────────────────────────────────────────
+        const testimonyContainer = document.getElementById('testimony');
+        let wordElements = [];
+        let testimonyStarted = false;
+        let currentWordIndex = 0;
+        let lastWordTime = 0;
+        let wordInterval = 320; // ms between words — retuned per artifact
+
+        // Rebuilds the testimony line for a new exhibit. Word-by-word
+        // reveal only — never letter-by-letter.
+        function setTestimonyText(text) {
+            testimonyContainer.innerHTML = '';
+            wordElements = [];
+            testimonyStarted = false;
+            currentWordIndex = 0;
+
+            text.split(' ').forEach((word) => {
+                const span = document.createElement('span');
+                span.className = 'testimony-word';
+                span.textContent = word;
+                testimonyContainer.appendChild(span);
+                wordElements.push(span);
+            });
+        }
+
+        function startTestimony() {
+            testimonyStarted = true;
+            lastWordTime = performance.now();
+        }
+
+        function updateTestimony(now) {
+            if (!testimonyStarted) return;
+            if (currentWordIndex >= wordElements.length) return;
+
+            if (now - lastWordTime >= wordInterval) {
+                wordElements[currentWordIndex].classList.add('visible');
+                currentWordIndex++;
+                lastWordTime = now;
+            }
+        }
+
+        // ─────────────────────────────────────────
+        // IDENTITY PANEL
+        // ─────────────────────────────────────────
+        const titleEl = document.getElementById('title');
+        const detailPeriodEl = document.getElementById('detail-period');
+        const detailLocationEl = document.getElementById('detail-location');
+        const detailDiscoveryEl = document.getElementById('detail-discovery');
+        const detailMaterialEl = document.getElementById('detail-material');
+
+        // Default label set, matching the four detail-groups baked into
+        // the HTML. An exhibit can override these (e.g. Voyager's
+        // "Mission" in place of "Discovery") via artifactData.detailLabels
+        // without touching the panel's markup or styling at all.
+        const DEFAULT_DETAIL_LABELS = ['Period', 'Location', 'Discovery', 'Material'];
+
+        // Any detail field can be a single string or a short list of
+        // lines (Voyager's gold-plating / instruments / power source;
+        // the Rosetta Stone's "Originally… / Currently…" location and
+        // two-line discovery) — rendered with plain <br> breaks inside
+        // the existing .detail-value element, no new styling involved.
+        function setDetailValue(el, value) {
+            el.innerHTML = Array.isArray(value) ? value.join('<br>') : value;
+        }
+
+        function updateIdentityPanel(artifactData) {
+            titleEl.textContent = artifactData.title;
+
+            const labels = artifactData.detailLabels || DEFAULT_DETAIL_LABELS;
+            detailPeriodEl.previousElementSibling.textContent = labels[0];
+            detailLocationEl.previousElementSibling.textContent = labels[1];
+            detailDiscoveryEl.previousElementSibling.textContent = labels[2];
+            detailMaterialEl.previousElementSibling.textContent = labels[3];
+
+            setDetailValue(detailPeriodEl, artifactData.period);
+            setDetailValue(detailLocationEl, artifactData.location);
+            setDetailValue(detailDiscoveryEl, artifactData.discovery);
+            setDetailValue(detailMaterialEl, artifactData.material);
+        }
+
+        // Reuses the same .fade-in-up / .revealed mechanism as the
+        // original entrance sequence, so reveal styling never diverges
+        // between first load and later transitions.
+        function revealIdentityPanel() {
+            document.querySelectorAll('.fade-in-up').forEach((el) => {
+                el.classList.add('revealed');
+            });
+        }
+
+        function hideIdentityPanel() {
+            document.querySelectorAll('.fade-in-up').forEach((el) => {
+                el.classList.remove('revealed');
+            });
+        }
+
+        // ─────────────────────────────────────────
+        // ENTRANCE SEQUENCE
+        // ─────────────────────────────────────────
+        let entranceComplete = false;
+        let entranceStartTime = 0;
+        let entranceDuration = 2000; // ms for object to fade in — retuned per artifact
+        let exitDuration = 400;      // ms for object to fade out — retuned per artifact
+
+        // ─────────────────────────────────────────
+        // DIRECTION: per-artifact choreography
+        // ─────────────────────────────────────────
+        // Everything that gives an exhibit its own personality — beam
+        // width, idle behavior, how close the camera holds, testimony
+        // pace, entrance/exit timing — is applied here from the
+        // artifact's `direction` object. The engine (loader, transition
+        // system, animation loop) never changes; only the direction does.
+
+        let idleMode = 'orbit';           // 'orbit' | 'breathe' | 'still-then-orbit' | 'drift' | 'present'
+        const ORBIT_IDLE_MODES = new Set(['orbit', 'still-then-orbit']);
+        const BREATHE_AMPLITUDE = Math.PI / 18; // ~10°, like the plaque brief asked for
+        const BREATHE_PERIOD_MS = 16000;        // slow, deliberate — one full sway cycle
+
+        // 'present' idle mode (currently only the Rosetta Stone): the
+        // object holds perfectly still, and only every 12–15s does it
+        // rotate a small amount, pause, and return slowly — a curator
+        // presenting a different face rather than a turntable. Driven
+        // by its own timer/tween chain rather than the per-frame
+        // elapsed-time math used by 'breathe'/'drift', since the motion
+        // isn't periodic on a fixed cycle.
+        const PRESENT_ROTATE_IN_MS = 900;
+        const PRESENT_HOLD_MS = 900;
+        const PRESENT_RETURN_MS = 1600;
+        let presentTimer = null;
+        let presentToken = 0;
+        // Tiny, barely-noticeable tumble/wander for the 'drift' idle mode —
+        // "a spacecraft that has been travelling for decades without
+        // anyone watching."
+        const DRIFT_ROTATION_SPEED = 0.008;     // radians/sec
+        const DRIFT_TILT_AMPLITUDE = 0.035;     // ~2°
+        const DRIFT_POSITION_AMPLITUDE = 0.035; // scene units
+        let currentPoolOpacity = LIGHT_POOL_OPACITY; // retuned per artifact
+        let currentBeamOpacity = BEAM_OPACITY;        // retuned per artifact
+        let currentAmbientIntensity = DEFAULT_AMBIENT_INTENSITY; // retuned per artifact
+        let currentStarOpacity = 0;                   // retuned per artifact
+        let idleStartTimer = null;
+        let glintTimer = null;
+
+        // Schedules the one-off golden catch-light some exhibits use
+        // (currently only Voyager). Cancels any pending glint from a
+        // previous exhibit first, so a manual advance mid-glint never
+        // leaves a stray timer firing into the wrong exhibit.
+        function scheduleGoldenGlint(direction) {
+            clearTimeout(glintTimer);
+            goldenGlintLight.intensity = 0;
+            if (!direction?.goldenGlintDelayMs) return;
+            glintTimer = setTimeout(async () => {
+                await tweenLightIntensity(goldenGlintLight, GOLDEN_GLINT_INTENSITY, 600);
+                await wait(500);
+                await tweenLightIntensity(goldenGlintLight, 0, 1000);
+            }, direction.goldenGlintDelayMs);
+        }
+
+        // Drives the 'present' idle mode: waits a random 12–15s interval,
+        // rotates the artifact by direction.presentRotationDeg, holds
+        // briefly, eases back to its resting orientation, then repeats —
+        // for as long as `token` still matches the current presentToken.
+        // Cancelling is just bumping presentToken, so a mid-cycle
+        // transition (or a manual advance) never leaves a stray rotation
+        // bleeding into the next exhibit.
+        function schedulePresentRotation(direction) {
+            presentToken += 1;
+            const token = presentToken;
+            clearTimeout(presentTimer);
+
+            const amplitude = ((direction.presentRotationDeg ?? 8) * Math.PI) / 180;
+            const minMs = direction.presentIntervalMinMs ?? 12000;
+            const maxMs = direction.presentIntervalMaxMs ?? 15000;
+
+            async function cycle() {
+                if (token !== presentToken) return;
+                const delay = minMs + Math.random() * (maxMs - minMs);
+                presentTimer = setTimeout(async () => {
+                    if (token !== presentToken) return;
+                    await tweenValue(PRESENT_ROTATE_IN_MS, (t) => {
+                        if (token !== presentToken) return;
+                        artifactRoot.rotation.y = amplitude * t;
+                    });
+                    if (token !== presentToken) return;
+                    await wait(PRESENT_HOLD_MS);
+                    if (token !== presentToken) return;
+                    await tweenValue(PRESENT_RETURN_MS, (t) => {
+                        if (token !== presentToken) return;
+                        artifactRoot.rotation.y = amplitude * (1 - t);
+                    });
+                    cycle();
+                }, delay);
+            }
+            cycle();
+        }
+
+        // Stops any in-flight 'present' cycle without starting a new one
+        // (used when leaving the mode entirely).
+        function cancelPresentRotation() {
+            presentToken += 1;
+            clearTimeout(presentTimer);
+        }
+
+        // Applies a direction's spotlight character, idle behavior,
+        // camera framing, and pacing. Called while the outgoing exhibit
+        // is fully dark (spotlight intensity 0), so angle/penumbra
+        // changes never pop visibly mid-transition.
+        function applyDirection(direction) {
+            if (!direction) return;
+
+            // Spotlight personality — broad wash, narrow interrogation,
+            // or a cold monumental beam. Color defaults to the warm
+            // gallery tone; an exhibit can request a colder cast. An
+            // exhibit can also drop intensity to 0 to have no theatrical
+            // spotlight at all (see Voyager).
+            mainSpot.angle = direction.spotlight.angle;
+            mainSpot.penumbra = direction.spotlight.penumbra;
+            MAIN_SPOT_INTENSITY = direction.spotlight.intensity;
+            mainSpot.color.setHex(direction.spotlight.color ?? DEFAULT_SPOT_COLOR);
+            beamMaterial.color.setHex(direction.spotlight.color ?? DEFAULT_SPOT_COLOR);
+            rebuildLightBeam(direction.spotlight.angle);
+            currentBeamOpacity = direction.beamOpacity ?? BEAM_OPACITY;
+
+            // Rim light — ordinarily a tight museum kiss separating
+            // object from darkness. A space exhibit can repurpose this
+            // same light as a faint, distant "sun" instead (wider,
+            // weaker, colder) via direction.rimLight, rather than
+            // introducing a second light type.
+            const rim = direction.rimLight ?? {};
+            rimLight.angle = rim.angle ?? DEFAULT_RIM_ANGLE;
+            rimLight.penumbra = rim.penumbra ?? DEFAULT_RIM_PENUMBRA;
+            rimLight.distance = rim.distance ?? DEFAULT_RIM_DISTANCE;
+            rimLight.decay = rim.decay ?? DEFAULT_RIM_DECAY;
+            rimLight.color.setHex(rim.color ?? DEFAULT_RIM_COLOR);
+            const rimPos = rim.position ?? DEFAULT_RIM_POSITION;
+            rimLight.position.set(rimPos[0], rimPos[1], rimPos[2]);
+            RIM_LIGHT_INTENSITY = rim.intensity ?? DEFAULT_RIM_INTENSITY;
+
+            // Fill light — nearly always the same faint neutral wash;
+            // a space exhibit can dim and cool it further.
+            const fill = direction.fillLight ?? {};
+            fillLight.color.setHex(fill.color ?? DEFAULT_FILL_COLOR);
+            FILL_LIGHT_INTENSITY = fill.intensity ?? DEFAULT_FILL_INTENSITY;
+
+            // Ambient and starfield — both effectively 0 for every
+            // exhibit except a space-mode one.
+            currentAmbientIntensity = direction.ambientIntensity ?? DEFAULT_AMBIENT_INTENSITY;
+            currentStarOpacity = direction.starOpacity ?? 0;
+
+            // Idle behavior: camera orbits (immediately, or after a held
+            // pause — see beginIdleRotation), the artifact breathes
+            // gently in place like a painting under study, or — for a
+            // space exhibit — drifts almost imperceptibly, as something
+            // unwatched for decades would.
+            idleMode = direction.idle;
+            controls.autoRotateSpeed = direction.autoRotateSpeed ?? DEFAULT_AUTOROTATE_SPEED;
+            clearTimeout(idleStartTimer);
+            cancelPresentRotation();
+            const isOrbitFamily = ORBIT_IDLE_MODES.has(idleMode);
+            const hasDelayedStart = isOrbitFamily && (direction.idleStartDelayMs || 0) > 0;
+            controls.autoRotate = isOrbitFamily && !hasDelayedStart;
+            // Reset any prior breathing/drift offset in both rotation
+            // and position, so switching exhibits never leaves a residual
+            // tumble or wander behind.
+            artifactRoot.rotation.set(0, 0, 0);
+            artifactRoot.position.set(0, ARTIFACT_ROOT_BASE_Y, 0);
+
+            // Camera framing — how close this exhibit wants the visitor,
+            // plus a tiny vertical retarget for artifacts taller than
+            // the default gaze height (or, for Voyager, floating rather
+            // than standing).
+            controls.minDistance = direction.cameraDistance.min;
+            controls.maxDistance = direction.cameraDistance.max;
+            controls.target.y = direction.cameraTargetY ?? DEFAULT_CAMERA_TARGET_Y;
+
+            // Floor light — most exhibits share one glow strength, a
+            // monumental piece can ask to be grounded more firmly, and a
+            // space exhibit has no floor to glow at all.
+            currentPoolOpacity = direction.poolOpacity ?? LIGHT_POOL_OPACITY;
+
+            // Pacing.
+            wordInterval = direction.wordInterval;
+            entranceDuration = direction.entranceDuration;
+            exitDuration = direction.exitDuration;
+        }
+
+        // For idle modes that start moving only after the visitor has
+        // had a moment with the artifact (e.g. the Terracotta Warrior's
+        // ~2s of stillness before its almost-imperceptible rotation
+        // begins). Called once the artifact is actually visible, not
+        // when applyDirection runs (which is still mid-darkness).
+        function beginIdleRotation(direction) {
+            clearTimeout(idleStartTimer);
+            if (!direction) return;
+            const isOrbitFamily = ORBIT_IDLE_MODES.has(direction.idle);
+            const delay = direction.idleStartDelayMs || 0;
+            if (isOrbitFamily && delay > 0) {
+                idleStartTimer = setTimeout(() => {
+                    controls.autoRotate = true;
+                }, delay);
+            }
+        }
+
+        // Dollies the camera to a target distance from controls.target,
+        // preserving its current viewing angle. Used so each exhibit's
+        // preferred camera distance is actually arrived at, not just
+        // set as a drag limit.
+        function tweenCameraDistance(targetDistance, duration) {
+            const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+            const startDistance = offset.length();
+            const direction3 = offset.clone().normalize();
+            return tweenValue(duration, (t) => {
+                const d = startDistance + (targetDistance - startDistance) * t;
+                camera.position.copy(controls.target).addScaledVector(direction3, d);
+            });
+        }
+
+        function startEntrance() {
+            applyDirection(ARTIFACTS[currentArtifactIndex].direction);
+            beginIdleRotation(ARTIFACTS[currentArtifactIndex].direction);
+            if (ARTIFACTS[currentArtifactIndex].direction.idle === 'present') {
+                schedulePresentRotation(ARTIFACTS[currentArtifactIndex].direction);
+            }
+            scheduleGoldenGlint(ARTIFACTS[currentArtifactIndex].direction);
+            updateIdentityPanel(ARTIFACTS[currentArtifactIndex]);
+            setTestimonyText(ARTIFACTS[currentArtifactIndex].quote);
+
+            // Hide loading screen
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+            }, 400);
+
+            // Reveal identity panel elements
+            setTimeout(() => {
+                revealIdentityPanel();
+            }, 800);
+
+            // Start testimony after a contemplative pause
+            setTimeout(startTestimony, 2500);
+
+            // Begin counting down to the next exhibit once this one has
+            // had time to breathe.
+            scheduleAutoAdvance();
+        }
+
+
+        // ─────────────────────────────────────────
+        // PLAYBACK CONTROLS — STATE & UI
+        // ─────────────────────────────────────────
+        let isPaused = false;
+        let barOpen = false;
+        let barHideTimer = null;
+        const BAR_AUTO_HIDE_MS = 3000;
+
+        const playbackTrigger = document.getElementById('playback-trigger');
+        const playbackBar = document.getElementById('playback-bar');
+        const iconPlay = document.getElementById('icon-play');
+        const iconPause = document.getElementById('icon-pause');
+        const progressFill = document.getElementById('progress-fill');
+
+        function updatePlayPauseIcon() {
+            if (isPaused) {
+                iconPlay.style.display = 'block';
+                iconPause.style.display = 'none';
+                playbackTrigger.classList.add('paused');
+            } else {
+                iconPlay.style.display = 'none';
+                iconPause.style.display = 'block';
+                playbackTrigger.classList.remove('paused');
+            }
+        }
+
+        function openBar() {
+            barOpen = true;
+            playbackBar.classList.add('open');
+            playbackTrigger.classList.add('active');
+            resetBarHideTimer();
+        }
+
+        function closeBar() {
+            barOpen = false;
+            playbackBar.classList.remove('open');
+            playbackTrigger.classList.remove('active');
+            clearTimeout(barHideTimer);
+        }
+
+        function toggleBar() {
+            if (barOpen) closeBar();
+            else openBar();
+        }
+
+        function resetBarHideTimer() {
+            clearTimeout(barHideTimer);
+            barHideTimer = setTimeout(() => {
+                if (barOpen) closeBar();
+            }, BAR_AUTO_HIDE_MS);
+        }
+
+        playbackTrigger.addEventListener('click', toggleBar);
+
+        playbackBar.addEventListener('mouseenter', () => {
+            clearTimeout(barHideTimer);
+        });
+        playbackBar.addEventListener('mouseleave', resetBarHideTimer);
+
+        document.getElementById('btn-play-pause').addEventListener('click', () => {
+            isPaused = !isPaused;
+            updatePlayPauseIcon();
+            if (isPaused) {
+                clearTimeout(autoAdvanceTimer);
+                controls.autoRotate = false;
+            } else {
+                scheduleAutoAdvance();
+                if (ORBIT_IDLE_MODES.has(idleMode)) {
+                    controls.autoRotate = true;
+                }
+            }
+            resetBarHideTimer();
+        });
+
+        // ─────────────────────────────────────────
+        // PROGRESS BAR
+        // ─────────────────────────────────────────
+        function updateProgress() {
+            if (isPaused || isTransitioning) {
+                requestAnimationFrame(updateProgress);
+                return;
+            }
+            const artifact = ARTIFACTS[currentArtifactIndex];
+            const dwell = artifact.direction?.dwellMs ?? EXHIBIT_DWELL_MS;
+            const elapsed = performance.now() - entranceStartTime;
+            const progress = Math.min(elapsed / dwell, 1);
+            progressFill.style.width = `${progress * 100}%`;
+            requestAnimationFrame(updateProgress);
+        }
+
+        // ─────────────────────────────────────────
+        // TRANSITION SYSTEM
+        // ─────────────────────────────────────────
+        // "History doesn't scroll. It reveals itself." The whole stage —
+        // artifact, floor, light pool, and lights — is thrown sideways as
+        // one, the camera never moves, and a handful of blurred silhouette
+        // exhibits flash past to imply a much larger collection than the
+        // one currently loaded.
+
+        const EXHIBIT_DWELL_MS = 14000; // fallback if an artifact has no dwellMs of its own
+        const SWOOSH_DISTANCE = 22;      // how far the stage is thrown, in scene units
+        const IDLE_ROTATE_RESUME_MS = 3000;
+
+        // Entering a space-mode exhibit (currently only Voyager) never
+        // uses the swoosh. Instead: a slower total fade, a held beat of
+        // complete blackness, then a very slow arrival.
+        const SPACE_ENTRY_FADE_MS = 1400;    // "everything slowly fades"
+        const BLACKOUT_HOLD_MS = 1000;       // "roughly one second... no movement"
+        const SPACE_ARRIVAL_LIGHT_MS = 3200; // "very slowly" the rim light appears
+
+        let isTransitioning = false;
+        let autoAdvanceTimer = null;
+
+        function scheduleAutoAdvance() {
+            clearTimeout(autoAdvanceTimer);
+            if (isPaused) return;
+            const dwell = ARTIFACTS[currentArtifactIndex].direction?.dwellMs ?? EXHIBIT_DWELL_MS;
+            autoAdvanceTimer = setTimeout(() => {
+                advanceToNextArtifact();
+            }, dwell);
+        }
+
+        function wait(ms) {
+            return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        function easeOutCubic(t) {
+            return 1 - Math.pow(1 - t, 3);
+        }
+
+        // Generic tween driver: calls onUpdate(easedProgress) every frame
+        // for `duration` ms, then resolves.
+        function tweenValue(duration, onUpdate) {
+            return new Promise((resolve) => {
+                const start = performance.now();
+                function step(now) {
+                    const t = Math.min((now - start) / duration, 1);
+                    onUpdate(easeOutCubic(t));
+                    if (t < 1) {
+                        requestAnimationFrame(step);
+                    } else {
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(step);
+            });
+        }
+
+        function tweenLightIntensity(light, targetIntensity, duration) {
+            const start = light.intensity;
+            return tweenValue(duration, (t) => {
+                light.intensity = start + (targetIntensity - start) * t;
+            });
+        }
+
+        function tweenMaterialOpacity(material, targetOpacity, duration) {
+            const start = material.opacity;
+            return tweenValue(duration, (t) => {
+                material.opacity = start + (targetOpacity - start) * t;
+            });
+        }
+
+        function tweenArtifactOpacity(materials, targetOpacity, duration) {
+            if (!materials.length) return Promise.resolve();
+            materials.forEach((mat) => {
+                mat.transparent = true;
+            });
+            const startOpacities = materials.map((mat) => mat.opacity);
+            return tweenValue(duration, (t) => {
+                materials.forEach((mat, i) => {
+                    mat.opacity = startOpacities[i] + (targetOpacity - startOpacities[i]) * t;
+                });
+            });
+        }
+
+        function tweenStagePosition(targetX, duration) {
+            const start = stageGroup.position.x;
+            return tweenValue(duration, (t) => {
+                stageGroup.position.x = start + (targetX - start) * t;
+            });
+        }
+
+        // Vague geometric silhouettes — never identifiable, just enough
+        // to communicate that many other witnesses exist beyond this one.
+        function createSilhouettes() {
+            const group = new THREE.Group();
+            const shapeBuilders = [
+                () => new THREE.BoxGeometry(0.8, 1.6, 0.8),
+                () => new THREE.SphereGeometry(0.6, 12, 12),
+                () => new THREE.CylinderGeometry(0.4, 0.4, 1.8, 12),
+                () => new THREE.ConeGeometry(0.5, 1.4, 10),
+                () => new THREE.BoxGeometry(0.5, 2.2, 0.5),
+                () => new THREE.CylinderGeometry(0.3, 0.6, 1.2, 8),
+            ];
+
+            const count = 8;
+            for (let i = 0; i < count; i++) {
+                const geometry = shapeBuilders[i % shapeBuilders.length]();
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0x1a1a18,
+                    transparent: true,
+                    opacity: 0.45 + Math.random() * 0.25,
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(
+                    4 + i * 2.4 + Math.random() * 0.8,   // spread to the right, staggered
+                    0.3 + Math.random() * 1.4,           // varying heights
+                    (Math.random() - 0.5) * 3.5           // varying depth
+                );
+                mesh.scale.setScalar(0.6 + Math.random() * 0.7); // varying scale
+                mesh.rotation.y = Math.random() * Math.PI;
+                group.add(mesh);
+            }
+            return group;
+        }
+
+        function disposeGroup(group) {
+            group.traverse((node) => {
+                if (node.isMesh) {
+                    node.geometry?.dispose();
+                    node.material?.dispose();
+                }
+                if (node.isSprite) {
+                    node.material?.map?.dispose();
+                    node.material?.dispose();
+                }
+            });
+        }
+
+        // ─────────────────────────────────────────
+        // INSCRIPTION FRAGMENTS: the space→Rosetta transition
+        // ─────────────────────────────────────────
+        // Used only when leaving a space-mode exhibit (currently
+        // Voyager → Rosetta Stone). Instead of the usual swoosh of
+        // silhouettes, faint fragments of hieroglyphs, demotic script,
+        // and ancient Greek letters drift up out of the darkness —
+        // atmosphere only, deliberately never composed into anything
+        // readable. Three small canvas textures stand in for the three
+        // scripts; simple procedural marks for hieroglyphs/demotic
+        // (guaranteed to render everywhere) and scattered individual
+        // Greek letters for the third — never assembled into words.
+        function makeGlyphCanvas(drawFn) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            drawFn(ctx, canvas.width, canvas.height);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // A handful of small abstract mark-making functions — never
+        // legible glyphs, just gestures toward hieroglyphic/demotic
+        // mark-making.
+        const GLYPH_DRAWERS = [
+            (ctx, w, h) => { // bird-like hieroglyph gesture
+                ctx.beginPath();
+                ctx.moveTo(30, 90); ctx.quadraticCurveTo(64, 20, 98, 40);
+                ctx.quadraticCurveTo(70, 55, 60, 95);
+                ctx.stroke();
+            },
+            (ctx, w, h) => { // eye-like hieroglyph gesture
+                ctx.beginPath();
+                ctx.ellipse(64, 64, 38, 18, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(64, 64, 8, 0, Math.PI * 2);
+                ctx.fill();
+            },
+            (ctx, w, h) => { // demotic cursive squiggle
+                ctx.beginPath();
+                ctx.moveTo(20, 60);
+                ctx.bezierCurveTo(40, 20, 60, 100, 80, 40);
+                ctx.bezierCurveTo(90, 15, 100, 70, 112, 50);
+                ctx.stroke();
+            },
+            (ctx, w, h) => { // demotic short strokes
+                ctx.beginPath();
+                ctx.moveTo(24, 40); ctx.lineTo(70, 30);
+                ctx.moveTo(30, 70); ctx.lineTo(90, 60);
+                ctx.moveTo(20, 100); ctx.lineTo(60, 92);
+                ctx.stroke();
+            },
+            (ctx, w, h) => { // scattered Greek letter (never a word)
+                ctx.font = '76px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const letters = ['Α', 'Θ', 'Ξ', 'Σ', 'Φ', 'Ω', 'Λ', 'Δ'];
+                ctx.fillText(letters[Math.floor(Math.random() * letters.length)], 64, 68);
+            },
+        ];
+
+        function createInscriptionFragments() {
+            const group = new THREE.Group();
+            const count = 14;
+            for (let i = 0; i < count; i++) {
+                const drawer = GLYPH_DRAWERS[i % GLYPH_DRAWERS.length];
+                const texture = makeGlyphCanvas(drawer);
+                const material = new THREE.SpriteMaterial({
+                    map: texture,
+                    transparent: true,
+                    opacity: 0,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    color: 0xEDE3CF,
+                });
+                const sprite = new THREE.Sprite(material);
+                const scale = 0.5 + Math.random() * 0.6;
+                sprite.scale.set(scale, scale, 1);
+                sprite.position.set(
+                    (Math.random() - 0.5) * 9,
+                    0.2 + Math.random() * 3.2,
+                    (Math.random() - 0.5) * 3
+                );
+                // A slow upward, slightly sideways drift — "like
+                // forgotten memories" — applied per-frame via userData
+                // rather than a dedicated animation loop hook, read by
+                // driftInscriptionFragments() while the group is alive.
+                sprite.userData.driftY = 0.06 + Math.random() * 0.08;
+                sprite.userData.driftX = (Math.random() - 0.5) * 0.05;
+                group.add(sprite);
+            }
+            return group;
+        }
+
+        // Advances the slow drift of an inscription-fragment group by
+        // one frame's worth of motion. Called from a short-lived
+        // requestAnimationFrame loop owned by the transition itself
+        // (not the main animate() loop) so it cleanly starts and stops
+        // with the group's own lifetime.
+        function driftInscriptionFragments(group, deltaSeconds) {
+            group.children.forEach((sprite) => {
+                sprite.position.y += sprite.userData.driftY * deltaSeconds;
+                sprite.position.x += sprite.userData.driftX * deltaSeconds;
+            });
+        }
+
+        function tweenGroupOpacity(group, targetOpacity, duration) {
+            const sprites = group.children;
+            if (!sprites.length) return Promise.resolve();
+            const startOpacities = sprites.map((s) => s.material.opacity);
+            return tweenValue(duration, (t) => {
+                sprites.forEach((sprite, i) => {
+                    sprite.material.opacity = startOpacities[i] + (targetOpacity - startOpacities[i]) * t;
+                });
+            });
+        }
+
+        // Runs a short-lived rAF loop driving both the drift and an
+        // opacity tween together, since the fragments need to be moving
+        // the entire time they're visible, not just during the fade
+        // in/out edges.
+        function playInscriptionFragments(group, { holdMs = 1600, fadeInMs = 900, fadeOutMs = 1100 } = {}) {
+            return new Promise((resolve) => {
+                let last = performance.now();
+                const start = last;
+                const totalMs = fadeInMs + holdMs + fadeOutMs;
+
+                function step(now) {
+                    const deltaSeconds = (now - last) / 1000;
+                    last = now;
+                    const elapsedMs = now - start;
+
+                    driftInscriptionFragments(group, deltaSeconds);
+
+                    let opacity;
+                    if (elapsedMs < fadeInMs) {
+                        opacity = (elapsedMs / fadeInMs) * 0.16;
+                    } else if (elapsedMs < fadeInMs + holdMs) {
+                        opacity = 0.16;
+                    } else {
+                        const t = (elapsedMs - fadeInMs - holdMs) / fadeOutMs;
+                        opacity = 0.16 * (1 - Math.min(t, 1));
+                    }
+                    group.children.forEach((sprite) => {
+                        sprite.material.opacity = opacity;
+                    });
+
+                    if (elapsedMs < totalMs) {
+                        requestAnimationFrame(step);
+                    } else {
+                        resolve();
+                    }
+                }
+                requestAnimationFrame(step);
+            });
+        }
+
+        async function advanceToNextArtifact() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+            clearTimeout(autoAdvanceTimer);
+            clearTimeout(glintTimer);
+            goldenGlintLight.intensity = 0;
+
+            const nextIndex = (currentArtifactIndex + 1) % ARTIFACTS.length;
+            const nextData = ARTIFACTS[nextIndex];
+            const enteringSpace = !!nextData.direction?.spaceMode;
+            // Leaving a space-mode exhibit (currently only Voyager → the
+            // Rosetta Stone) gets its own quiet transition — see Phase C
+            // below — instead of the usual swoosh.
+            const leavingSpace = !!ARTIFACTS[currentArtifactIndex].direction?.spaceMode;
+
+            // Phase A — a contemplative beat before the world reacts
+            await wait(800);
+
+            // Phase B — the current witness recedes into darkness, using
+            // its OWN exit style (set the last time applyDirection ran,
+            // for the exhibit currently on stage). Entering OR leaving a
+            // space-mode exhibit uses a slower, more total fade instead
+            // of the usual quick exit — "everything slowly fades" rather
+            // than a swoosh; "the distant sunlight fades, the stars
+            // disappear one by one."
+            const fadeOutDuration = (enteringSpace || leavingSpace) ? SPACE_ENTRY_FADE_MS : exitDuration;
+            hideIdentityPanel();
+            await Promise.all([
+                tweenArtifactOpacity(artifactMaterials, 0, fadeOutDuration),
+                tweenLightIntensity(mainSpot, 0, fadeOutDuration),
+                tweenLightIntensity(rimLight, 0, fadeOutDuration),
+                tweenLightIntensity(fillLight, 0, fadeOutDuration),
+                tweenLightIntensity(ambient, 0, fadeOutDuration),
+                tweenMaterialOpacity(beamMaterial, 0, fadeOutDuration),
+                tweenMaterialOpacity(lightPool.material, 0, fadeOutDuration),
+                tweenMaterialOpacity(starMaterial, 0, fadeOutDuration),
+            ]);
+
+            disposeArtifactModel();
+
+            // The stage is now fully dark — safe to retune the spotlight
+            // shape, idle behavior, camera framing, and pacing for the
+            // incoming exhibit without any visible pop.
+            applyDirection(nextData.direction);
+
+            // Begin loading the next artifact while the transition plays
+            // out, using the exact same loading pipeline as every other
+            // exhibit — no duplicated loading logic.
+            const loadPromise = loadArtifact(nextData, { autoEntrance: false });
+
+            if (enteringSpace) {
+                // No swoosh, no silhouettes — the museum doesn't just
+                // change exhibits here, it ends. The camera eases to its
+                // far-back space framing while the screen is completely
+                // black (so the move is never actually seen), then the
+                // darkness itself is held for a beat — no movement, no
+                // sound — before anything returns.
+                await tweenCameraDistance(
+                    (nextData.direction.cameraDistance.min + nextData.direction.cameraDistance.max) / 2,
+                    400
+                );
+                await wait(BLACKOUT_HOLD_MS);
+            } else if (leavingSpace) {
+                // Phase C — leaving space: no swoosh, no silhouettes.
+                // The camera eases to the next exhibit's framing while
+                // the screen holds complete darkness, that darkness is
+                // held for a beat, and then — instead of a violent
+                // swoosh — faint fragments of hieroglyphs, demotic
+                // script, and ancient Greek letters drift up out of the
+                // dark like forgotten memories, never composed into
+                // anything readable, before dissolving again.
+                await tweenCameraDistance(
+                    (nextData.direction.cameraDistance.min + nextData.direction.cameraDistance.max) / 2,
+                    400
+                );
+                await wait(BLACKOUT_HOLD_MS);
+
+                const fragments = createInscriptionFragments();
+                scene.add(fragments);
+                await playInscriptionFragments(fragments);
+                disposeGroup(fragments);
+                scene.remove(fragments);
+            } else {
+                // Phase C — the swoosh: history thrown sideways
+                const silhouettes = createSilhouettes();
+                stageGroup.add(silhouettes);
+
+                await Promise.all([
+                    tweenStagePosition(-SWOOSH_DISTANCE, 450),
+                    tweenCameraDistance(
+                        (nextData.direction.cameraDistance.min + nextData.direction.cameraDistance.max) / 2,
+                        450
+                    ),
+                ]);
+
+                // Cut — instantaneous, hidden by near-total darkness
+                stageGroup.position.x = 0;
+                disposeGroup(silhouettes);
+                stageGroup.remove(silhouettes);
+            }
+
+            await loadPromise.catch(() => {
+                // Error already logged inside loadArtifact; continue the
+                // sequence so the museum doesn't stall on a bad exhibit.
+            });
+
+            currentArtifactIndex = nextIndex;
+            updateIdentityPanel(nextData);
+            setTestimonyText(nextData.quote);
+
+            // A brief held beat in total darkness after the cut settles —
+            // "the movement settles, silence, darkness" — before anything
+            // ignites. Short enough not to read as a stall, long enough
+            // to feel like arrival rather than a jump cut.
+            await wait(300);
+
+            // Phase D — the witness settles in, using this exhibit's own
+            // entrance duration for the object fade (handled in the
+            // animation loop via `entranceDuration`). A space-mode
+            // exhibit ignites far more slowly than a spotlight ever does —
+            // "nothing rushes."
+            entranceComplete = false;
+            entranceStartTime = performance.now();
+            beginIdleRotation(nextData.direction);
+            if (nextData.direction.idle === 'present') {
+                schedulePresentRotation(nextData.direction);
+            }
+            scheduleGoldenGlint(nextData.direction);
+
+            const igniteDuration = enteringSpace ? SPACE_ARRIVAL_LIGHT_MS : 700;
+            if (nextData.direction.staggeredIgnite) {
+                // "The light begins at the base and gently climbs
+                // upward" — approximated as a phased ignite rather than
+                // a literal vertical sweep: the floor glow and ambient
+                // resolve first (grounding), then the spotlight itself
+                // rises in more slowly than the usual quick ignite.
+                await Promise.all([
+                    tweenMaterialOpacity(lightPool.material, currentPoolOpacity, 500),
+                    tweenLightIntensity(ambient, currentAmbientIntensity, 500),
+                    tweenLightIntensity(fillLight, FILL_LIGHT_INTENSITY, 500),
+                ]);
+                await Promise.all([
+                    tweenLightIntensity(mainSpot, MAIN_SPOT_INTENSITY, 1600),
+                    tweenLightIntensity(rimLight, RIM_LIGHT_INTENSITY, 1600),
+                    tweenMaterialOpacity(beamMaterial, currentBeamOpacity, 1600),
+                    tweenMaterialOpacity(starMaterial, currentStarOpacity, 1600),
+                ]);
+            } else {
+                await Promise.all([
+                    tweenLightIntensity(mainSpot, MAIN_SPOT_INTENSITY, igniteDuration),
+                    tweenLightIntensity(rimLight, RIM_LIGHT_INTENSITY, igniteDuration),
+                    tweenLightIntensity(fillLight, FILL_LIGHT_INTENSITY, igniteDuration),
+                    tweenLightIntensity(ambient, currentAmbientIntensity, igniteDuration),
+                    tweenMaterialOpacity(beamMaterial, currentBeamOpacity, igniteDuration),
+                    tweenMaterialOpacity(lightPool.material, currentPoolOpacity, igniteDuration),
+                    tweenMaterialOpacity(starMaterial, currentStarOpacity, igniteDuration),
+                ]);
+            }
+
+            revealIdentityPanel();
+            setTimeout(startTestimony, 600);
+
+            isTransitioning = false;
+            entranceStartTime = performance.now();
+            if (!isPaused) scheduleAutoAdvance();
+        }
+        // ─────────────────────────────────────────
+        // GO TO ARTIFACT (for prev / restart)
+        // ─────────────────────────────────────────
+        async function goToArtifact(targetIndex) {
+            if (isTransitioning) return;
+            isTransitioning = true;
+            clearTimeout(autoAdvanceTimer);
+            clearTimeout(glintTimer);
+            goldenGlintLight.intensity = 0;
+
+            const nextData = ARTIFACTS[targetIndex];
+            const enteringSpace = !!nextData.direction?.spaceMode;
+            const leavingSpace = !!ARTIFACTS[currentArtifactIndex].direction?.spaceMode;
+
+            await wait(800);
+
+            const fadeOutDuration = (enteringSpace || leavingSpace) ? SPACE_ENTRY_FADE_MS : exitDuration;
+            hideIdentityPanel();
+            await Promise.all([
+                tweenArtifactOpacity(artifactMaterials, 0, fadeOutDuration),
+                tweenLightIntensity(mainSpot, 0, fadeOutDuration),
+                tweenLightIntensity(rimLight, 0, fadeOutDuration),
+                tweenLightIntensity(fillLight, 0, fadeOutDuration),
+                tweenLightIntensity(ambient, 0, fadeOutDuration),
+                tweenMaterialOpacity(beamMaterial, 0, fadeOutDuration),
+                tweenMaterialOpacity(lightPool.material, 0, fadeOutDuration),
+                tweenMaterialOpacity(starMaterial, 0, fadeOutDuration),
+            ]);
+
+            disposeArtifactModel();
+            applyDirection(nextData.direction);
+
+            const loadPromise = loadArtifact(nextData, { autoEntrance: false });
+
+            if (enteringSpace) {
+                await tweenCameraDistance(
+                    (nextData.direction.cameraDistance.min + nextData.direction.cameraDistance.max) / 2,
+                    400
+                );
+                await wait(BLACKOUT_HOLD_MS);
+            } else if (leavingSpace) {
+                await tweenCameraDistance(
+                    (nextData.direction.cameraDistance.min + nextData.direction.cameraDistance.max) / 2,
+                    400
+                );
+                await wait(BLACKOUT_HOLD_MS);
+
+                const fragments = createInscriptionFragments();
+                scene.add(fragments);
+                await playInscriptionFragments(fragments);
+                disposeGroup(fragments);
+                scene.remove(fragments);
+            } else {
+                const silhouettes = createSilhouettes();
+                stageGroup.add(silhouettes);
+
+                await Promise.all([
+                    tweenStagePosition(-SWOOSH_DISTANCE, 450),
+                    tweenCameraDistance(
+                        (nextData.direction.cameraDistance.min + nextData.direction.cameraDistance.max) / 2,
+                        450
+                    ),
+                ]);
+
+                stageGroup.position.x = 0;
+                disposeGroup(silhouettes);
+                stageGroup.remove(silhouettes);
+            }
+
+            await loadPromise.catch(() => {});
+
+            currentArtifactIndex = targetIndex;
+            updateIdentityPanel(nextData);
+            setTestimonyText(nextData.quote);
+
+            await wait(300);
+
+            entranceComplete = false;
+            entranceStartTime = performance.now();
+            beginIdleRotation(nextData.direction);
+            if (nextData.direction.idle === 'present') {
+                schedulePresentRotation(nextData.direction);
+            }
+            scheduleGoldenGlint(nextData.direction);
+
+            const igniteDuration = enteringSpace ? SPACE_ARRIVAL_LIGHT_MS : 700;
+            if (nextData.direction.staggeredIgnite) {
+                await Promise.all([
+                    tweenMaterialOpacity(lightPool.material, currentPoolOpacity, 500),
+                    tweenLightIntensity(ambient, currentAmbientIntensity, 500),
+                    tweenLightIntensity(fillLight, FILL_LIGHT_INTENSITY, 500),
+                ]);
+                await Promise.all([
+                    tweenLightIntensity(mainSpot, MAIN_SPOT_INTENSITY, 1600),
+                    tweenLightIntensity(rimLight, RIM_LIGHT_INTENSITY, 1600),
+                    tweenMaterialOpacity(beamMaterial, currentBeamOpacity, 1600),
+                    tweenMaterialOpacity(starMaterial, currentStarOpacity, 1600),
+                ]);
+            } else {
+                await Promise.all([
+                    tweenLightIntensity(mainSpot, MAIN_SPOT_INTENSITY, igniteDuration),
+                    tweenLightIntensity(rimLight, RIM_LIGHT_INTENSITY, igniteDuration),
+                    tweenLightIntensity(fillLight, FILL_LIGHT_INTENSITY, igniteDuration),
+                    tweenLightIntensity(ambient, currentAmbientIntensity, igniteDuration),
+                    tweenMaterialOpacity(beamMaterial, currentBeamOpacity, igniteDuration),
+                    tweenMaterialOpacity(lightPool.material, currentPoolOpacity, igniteDuration),
+                    tweenMaterialOpacity(starMaterial, currentStarOpacity, igniteDuration),
+                ]);
+            }
+
+            revealIdentityPanel();
+            setTimeout(startTestimony, 600);
+
+            isTransitioning = false;
+            if (!isPaused) scheduleAutoAdvance();
+        }
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            resetBarHideTimer();
+            advanceToNextArtifact();
+        });
+
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            resetBarHideTimer();
+            goToArtifact((currentArtifactIndex - 1 + ARTIFACTS.length) % ARTIFACTS.length);
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            resetBarHideTimer();
+            goToArtifact(currentArtifactIndex);
+        });
+
+        // Keyboard shortcuts for playback controls
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                advanceToNextArtifact();
+            } else if (e.key === 'ArrowLeft') {
+                goToArtifact((currentArtifactIndex - 1 + ARTIFACTS.length) % ARTIFACTS.length);
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                document.getElementById('btn-play-pause').click();
+            } else if (e.key === 'r' || e.key === 'R') {
+                goToArtifact(currentArtifactIndex);
+            }
+        });
+
+        requestAnimationFrame(updateProgress);
+
+
+
+
+        // OrbitControls: pause the gentle auto-rotate while the visitor
+        // is interacting, and resume it after a few seconds of stillness.
+        let idleResumeTimer = null;
+        controls.addEventListener('start', () => {
+            controls.autoRotate = false;
+            clearTimeout(idleResumeTimer);
+        });
+        controls.addEventListener('end', () => {
+            clearTimeout(idleResumeTimer);
+            idleResumeTimer = setTimeout(() => {
+                controls.autoRotate = true;
+            }, IDLE_ROTATE_RESUME_MS);
+        });
+
+        // ─────────────────────────────────────────
+        // ANIMATION LOOP
+        // ─────────────────────────────────────────
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const elapsed = clock.getElapsedTime();
+
+            // Idle behavior is per-exhibit (see applyDirection):
+            //   'orbit'   — the camera slowly circles a still object,
+            //               exactly as before (controls.autoRotate).
+            //   'breathe' — the camera holds its position, and the
+            //               artifact itself sways ~10° left, pauses,
+            //               ~10° right, pauses — slow and deliberate,
+            //               like a painting being studied rather than
+            //               a specimen being spun.
+            controls.update();
+            if (idleMode === 'breathe') {
+                const cycle = (elapsed * 1000) % BREATHE_PERIOD_MS / BREATHE_PERIOD_MS;
+                // Smooth back-and-forth rather than a raw sine's constant
+                // motion — eases in and out of each extreme so it reads
+                // as a held pause rather than a mechanical oscillation.
+                const sway = Math.sin(cycle * Math.PI * 2);
+                const eased = Math.sign(sway) * Math.pow(Math.abs(sway), 0.6);
+                artifactRoot.rotation.y = eased * BREATHE_AMPLITUDE;
+            } else if (idleMode === 'drift') {
+                // Not a museum object performing for an audience — a
+                // spacecraft that has been travelling for decades without
+                // anyone watching. An extremely slow, continuous tumble
+                // plus a barely-there positional wander; nothing here
+                // should ever read as intentional motion.
+                artifactRoot.rotation.y = elapsed * DRIFT_ROTATION_SPEED;
+                artifactRoot.rotation.x = Math.sin(elapsed * 0.05) * DRIFT_TILT_AMPLITUDE;
+                artifactRoot.position.x = Math.sin(elapsed * 0.033) * DRIFT_POSITION_AMPLITUDE;
+                artifactRoot.position.y = ARTIFACT_ROOT_BASE_Y +
+                    Math.sin(elapsed * 0.021) * DRIFT_POSITION_AMPLITUDE * 0.5;
+            }
+
+            // Camera breathing: an almost imperceptible vertical drift,
+            // ~0.3% of the camera's distance from the artifact. Not
+            // meant to be consciously noticed — just enough that the
+            // room doesn't feel frozen.
+            const breatheAmplitude = camera.position.distanceTo(controls.target) * 0.003;
+            camera.position.y += Math.sin(elapsed * 0.15) * breatheAmplitude;
+
+            // Very subtle entrance fade-in for the artifact, once loaded
+            if (!entranceComplete && artifactMaterials.length > 0) {
+                const entranceProgress = Math.min((now - entranceStartTime) / entranceDuration, 1);
+                artifactMaterials.forEach((mat) => {
+                    mat.opacity = entranceProgress;
+                });
+                if (entranceProgress >= 1) {
+                    artifactMaterials.forEach((mat) => {
+                        mat.transparent = false;
+                    });
+                    entranceComplete = true;
+                }
+            }
+
+            // Update testimony word reveals
+            updateTestimony(now);
+
+            renderer.render(scene, camera);
+        }
+
+        // ─────────────────────────────────────────
+        // RESIZE HANDLER
+        // ─────────────────────────────────────────
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ─────────────────────────────────────────
+        // INIT
+        // ─────────────────────────────────────────
+        // Wait a brief moment for everything to settle, then begin
+        setTimeout(startEntrance, 300);
+        animate();
+
+    </script>
+</body>
+</html>
